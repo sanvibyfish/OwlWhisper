@@ -19,7 +19,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         hotkeyManager = HotkeyManager()
         hotkeyManager.onKeyDown = { [weak self] in self?.startRecording() }
-        hotkeyManager.onKeyUp = { [weak self] in self?.stopRecordingAndTranscribe() }
+        hotkeyManager.onKeyUp = { [weak self] in
+            // 延迟 300ms 停止录音，捕获语音尾巴
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self?.stopRecordingAndTranscribe()
+            }
+        }
         hotkeyManager.start()
 
         menubarController.onHotkeyChanged = { [weak self] in
