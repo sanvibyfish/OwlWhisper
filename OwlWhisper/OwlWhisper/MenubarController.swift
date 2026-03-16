@@ -24,7 +24,7 @@ class MenubarController: NSObject {
     private var currentFrames: [NSImage] = []
 
     override init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
         if let button = statusItem.button {
@@ -67,6 +67,8 @@ class MenubarController: NSObject {
 
     // MARK: - 动画
 
+    private static let animationSize = NSSize(width: 23, height: 18)
+
     private static let recordingFrames: [NSImage] = {
         let barSets: [[CGFloat]] = [
             [0.3, 0.8, 0.5],
@@ -75,7 +77,7 @@ class MenubarController: NSObject {
             [0.9, 0.5, 0.7],
         ]
         return barSets.map { heights in
-            let size = NSSize(width: 18, height: 18)
+            let size = animationSize
             let img = NSImage(size: size, flipped: false) { _ in
                 let barW: CGFloat = 2.5
                 let gap: CGFloat = 2.5
@@ -101,11 +103,10 @@ class MenubarController: NSObject {
     }()
 
     private static let transcribingFrames: [NSImage] = {
-        // 三个点依次高亮，4帧（3个点 + 1帧全暗）
         let dotCount = 3
         let dotR: CGFloat = 2.5
         let gap: CGFloat = 3.5
-        let size = NSSize(width: 18, height: 18)
+        let size = animationSize
 
         return (0..<(dotCount + 1)).map { frame in
             let img = NSImage(size: size, flipped: false) { _ in
