@@ -11,6 +11,7 @@ class ASRService {
 
     var onReady: ((String) -> Void)?
     var onError: ((String) -> Void)?
+    /// 线程安全：仅在 main thread 读写
     private(set) var isReady = false
 
     private let queue = DispatchQueue(label: "com.sanvi.OwlWhisper.asr")
@@ -19,6 +20,7 @@ class ASRService {
     private var punctuation: OpaquePointer?
     private var modelName = ""
     private let vadWindowSize: Int32 = 512
+    private var generation = 0  // 仅在 queue 上访问，用于检测 stop() 导致的指针失效
 
     func start() {
         queue.async { [weak self] in
@@ -27,21 +29,12 @@ class ASRService {
     }
 
     func stop() {
+        // 立即在主线程置 false，防止 stop() 之后仍有 transcribe 调用通过 guard
+        DispatchQueue.main.async { [weak self] in self?.isReady = false }
         queue.async { [weak self] in
             guard let self else { return }
-            if let r = self.recognizer {
-                SherpaOnnxDestroyOfflineRecognizer(r)
-                self.recognizer = nil
-            }
-            if let v = self.vad {
-                SherpaOnnxDestroyVoiceActivityDetector(v)
-                self.vad = nil
-            }
-            if let p = self.punctuation {
-                SherpaOnnxDestroyOfflinePunctuation(p)
-                self.punctuation = nil
-            }
-            DispatchQueue.main.async { self.isReady = false }
+            self.generation += 1
+            self.cleanupModels()
         }
     }
 
@@ -59,10 +52,10 @@ class ASRService {
                     userInfo: [NSLocalizedDescriptionKey: "ASR 未就绪"])))
                 return
             }
+            let gen = self.generation
 
             let t0 = CFAbsoluteTimeGetCurrent()
 
-            let rawCount = audioData.count / MemoryLayout<Float>.size
             var samples = audioData.withUnsafeBytes { buf -> [Float] in
                 let ptr = buf.bindMemory(to: Float.self)
                 return Array(ptr)
@@ -121,6 +114,13 @@ class ASRService {
                 return
             }
 
+            // 检查 stop() 是否在 VAD 处理期间被调用
+            guard self.generation == gen else {
+                completion(.failure(NSError(domain: "ASRService", code: -2,
+                    userInfo: [NSLocalizedDescriptionKey: "ASR 已停止"])))
+                return
+            }
+
             // 离线识别
             guard let stream = SherpaOnnxCreateOfflineStream(recognizer) else {
                 completion(.failure(NSError(domain: "ASRService", code: -3,
@@ -140,15 +140,24 @@ class ASRService {
                     text = String(cString: cText).trimmingCharacters(in: .whitespacesAndNewlines)
                 }
                 SherpaOnnxDestroyOfflineRecognizerResult(result)
+            } else {
+                NSLog("[ASRService] SherpaOnnxGetOfflineStreamResult 返回 nil，可能模型状态异常")
             }
 
             // 标点恢复
             if !text.isEmpty, let punct = self.punctuation {
-                let cInput = strdup(text)!
+                guard let cInput = strdup(text) else {
+                    NSLog("[ASRService] strdup 失败（内存不足），跳过标点恢复")
+                    let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+                    completion(.success(TranscribeResult(text: text, hasSpeech: true, durationMs: ms)))
+                    return
+                }
                 defer { free(cInput) }
                 if let cResult = SherpaOfflinePunctuationAddPunct(punct, cInput) {
                     text = String(cString: cResult)
                     SherpaOfflinePunctuationFreeText(cResult)
+                } else {
+                    NSLog("[ASRService] 标点推理失败（SherpaOfflinePunctuationAddPunct 返回 nil），使用无标点文本")
                 }
             }
 
@@ -172,8 +181,16 @@ class ASRService {
 
         // 查找 FireRedASR 模型
         let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(atPath: modelsDir),
-              let asrDirName = contents.first(where: { $0.hasPrefix("sherpa-onnx-fire-red-asr") }) else {
+        let contents: [String]
+        do {
+            contents = try fm.contentsOfDirectory(atPath: modelsDir)
+        } catch {
+            NSLog("[ASRService] 读取模型目录失败: %@", error.localizedDescription)
+            DispatchQueue.main.async { [weak self] in self?.onError?("读取模型目录失败: \(error.localizedDescription)") }
+            return
+        }
+
+        guard let asrDirName = contents.first(where: { $0.hasPrefix("sherpa-onnx-fire-red-asr") }) else {
             NSLog("[ASRService] 未找到 FireRedASR 模型")
             DispatchQueue.main.async { [weak self] in self?.onError?("未找到 FireRedASR 模型") }
             return
@@ -253,16 +270,18 @@ class ASRService {
         }
     }
 
+    // sherpa-onnx Create* 函数在调用时拷贝字符串，defer { free } 是安全的
     private func createRecognizer(encoder: String, decoder: String, tokens: String) -> OpaquePointer? {
-        // 使用 strdup 确保 C 字符串生命周期
-        let cEncoder = strdup(encoder)!
-        let cDecoder = strdup(decoder)!
-        let cTokens = strdup(tokens)!
-        defer {
-            free(cEncoder)
-            free(cDecoder)
-            free(cTokens)
+        guard let cEncoder = strdup(encoder) else {
+            NSLog("[ASRService] strdup 失败（内存不足）"); return nil
         }
+        guard let cDecoder = strdup(decoder) else {
+            free(cEncoder); return nil
+        }
+        guard let cTokens = strdup(tokens) else {
+            free(cEncoder); free(cDecoder); return nil
+        }
+        defer { free(cEncoder); free(cDecoder); free(cTokens) }
 
         var config = SherpaOnnxOfflineRecognizerConfig()
         config.feat_config.sample_rate = 16000
@@ -272,7 +291,7 @@ class ASRService {
         config.model_config.tokens = UnsafePointer(cTokens)
         config.model_config.num_threads = 2
         config.model_config.debug = 0
-        let cProvider = strdup("cpu")!
+        guard let cProvider = strdup("cpu") else { return nil }
         config.model_config.provider = UnsafePointer(cProvider)
         defer { free(cProvider) }
 
@@ -280,7 +299,10 @@ class ASRService {
     }
 
     private func createVAD(modelPath: String) -> OpaquePointer? {
-        let cModel = strdup(modelPath)!
+        guard let cModel = strdup(modelPath) else {
+            NSLog("[ASRService] strdup 失败（内存不足）")
+            return nil
+        }
         defer { free(cModel) }
 
         var config = SherpaOnnxVadModelConfig()
@@ -291,7 +313,7 @@ class ASRService {
         config.silero_vad.window_size = vadWindowSize
         config.sample_rate = 16000
         config.num_threads = 1
-        let cVadProvider = strdup("cpu")!
+        guard let cVadProvider = strdup("cpu") else { return nil }
         config.provider = UnsafePointer(cVadProvider)
         defer { free(cVadProvider) }
 
@@ -299,14 +321,17 @@ class ASRService {
     }
 
     private func createPunctuation(modelPath: String) -> OpaquePointer? {
-        let cModel = strdup(modelPath)!
+        guard let cModel = strdup(modelPath) else {
+            NSLog("[ASRService] strdup 失败（内存不足）")
+            return nil
+        }
         defer { free(cModel) }
 
         var config = SherpaOnnxOfflinePunctuationConfig()
         config.model.ct_transformer = UnsafePointer(cModel)
         config.model.num_threads = 1
         config.model.debug = 0
-        let cProvider = strdup("cpu")!
+        guard let cProvider = strdup("cpu") else { return nil }
         config.model.provider = UnsafePointer(cProvider)
         defer { free(cProvider) }
 
@@ -320,8 +345,14 @@ class ASRService {
         let dir = findModelsDirStatic()
         guard !dir.isEmpty else { return false }
         let fm = FileManager.default
-        guard let contents = try? fm.contentsOfDirectory(atPath: dir),
-              contents.contains(where: { $0.hasPrefix("sherpa-onnx-fire-red-asr") }) else { return false }
+        let contents: [String]
+        do {
+            contents = try fm.contentsOfDirectory(atPath: dir)
+        } catch {
+            NSLog("[ASRService] modelsReady: 读取模型目录失败: %@", error.localizedDescription)
+            return false
+        }
+        guard contents.contains(where: { $0.hasPrefix("sherpa-onnx-fire-red-asr") }) else { return false }
         return fm.fileExists(atPath: (dir as NSString).appendingPathComponent("silero_vad.onnx"))
     }
 
@@ -352,8 +383,5 @@ class ASRService {
         return ""
     }
 
-    private func findModelsDir() -> String {
-        // 直接复用静态方法，保持搜索逻辑一致
-        return Self.findModelsDirStatic()
-    }
+    private func findModelsDir() -> String { Self.findModelsDirStatic() }
 }

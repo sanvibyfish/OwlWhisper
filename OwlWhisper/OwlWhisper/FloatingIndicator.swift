@@ -14,6 +14,7 @@ class FloatingIndicator {
     private var dots: [NSView] = []
     private var animationTimer: Timer?
     private var animationFrame = 0
+    private var currentState: State = .hidden
 
     // 声波参数
     private static let barCount = 20
@@ -34,12 +35,14 @@ class FloatingIndicator {
     private static var windowHeight: CGFloat { barMaxH + padding * 2 }
 
     func setState(_ state: State) {
+        currentState = state
         switch state {
         case .recording:
             show()
             showWaveform()
             startWaveAnimation()
         case .transcribing:
+            show()
             showLoadingDots()
             startDotsAnimation()
         case .hidden:
@@ -106,10 +109,11 @@ class FloatingIndicator {
             ctx.duration = 0.2
             self.window?.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            self?.animationTimer?.invalidate()
-            self?.animationTimer = nil
-            self?.window?.orderOut(nil)
-            self?.clearContent()
+            guard let self, self.currentState == .hidden else { return }
+            self.animationTimer?.invalidate()
+            self.animationTimer = nil
+            self.window?.orderOut(nil)
+            self.clearContent()
         })
     }
 

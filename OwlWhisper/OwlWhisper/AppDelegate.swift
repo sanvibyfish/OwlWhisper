@@ -11,6 +11,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var floatingIndicator = FloatingIndicator()
 
     private var isRecording = false
+    private var pendingStop: DispatchWorkItem?
+    private var recordingTimeout: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         menubarController = MenubarController()
@@ -18,12 +20,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioRecorder = AudioRecorder()
 
         hotkeyManager = HotkeyManager()
-        hotkeyManager.onKeyDown = { [weak self] in self?.startRecording() }
+        hotkeyManager.onKeyDown = { [weak self] in
+            self?.pendingStop?.cancel()
+            self?.startRecording()
+        }
         hotkeyManager.onKeyUp = { [weak self] in
-            // 延迟 300ms 停止录音，捕获语音尾巴
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // 延迟 300ms 停止录音，捕获语音尾巴（可取消）
+            let work = DispatchWorkItem { [weak self] in
                 self?.stopRecordingAndTranscribe()
             }
+            self?.pendingStop = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
         }
         hotkeyManager.start()
 
@@ -36,11 +43,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 模型就绪 → 启动 ASR；缺模型或权限不全 → 弹设置窗口
-        let needsSetup = !ASRService.modelsReady()
+        let modelsReady = ASRService.modelsReady()
+        let needsSetup = !modelsReady
             || AVCaptureDevice.authorizationStatus(for: .audio) != .authorized
             || !AXIsProcessTrusted()
 
-        if ASRService.modelsReady() {
+        if modelsReady {
             startASR()
         }
 
@@ -84,23 +92,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isRecording = true
         menubarController.setState(.recording)
         floatingIndicator.setState(.recording)
-        audioRecorder.startRecording()
+
+        do {
+            try audioRecorder.startRecording()
+        } catch {
+            isRecording = false
+            menubarController.setState(.ready)
+            floatingIndicator.setState(.hidden)
+            log("录音启动失败: \(error.localizedDescription)")
+            return
+        }
         log("开始录音")
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
+        recordingTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in
             guard let self, self.isRecording else { return }
             self.log("录音超时 60s，自动停止")
             self.stopRecordingAndTranscribe()
         }
+        recordingTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 60, execute: timeout)
     }
 
     private func stopRecordingAndTranscribe() {
         guard isRecording else { return }
         isRecording = false
+        recordingTimeout?.cancel()
+        recordingTimeout = nil
         menubarController.setState(.transcribing)
         floatingIndicator.setState(.transcribing)
 
-        let audioData = audioRecorder.stopRecording()
+        let (audioData, recordingError) = audioRecorder.stopRecording()
+        if let recordingError {
+            log("录音期间出错: \(recordingError.localizedDescription)")
+        }
         log("停止录音，音频 \(audioData.count) 字节")
 
         if audioData.isEmpty {

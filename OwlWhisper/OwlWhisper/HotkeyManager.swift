@@ -94,6 +94,7 @@ class HotkeyManager {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var retryTimer: Timer?
+    private var retainedSelf: Unmanaged<HotkeyManager>?
 
     private var keyPressed = false
     private var config = HotkeyConfig.current
@@ -152,7 +153,11 @@ class HotkeyManager {
                 options: .defaultTap,
                 eventsOfInterest: mask,
                 callback: callback,
-                userInfo: Unmanaged.passUnretained(self).toOpaque()
+                userInfo: { [self] in
+                    let retained = Unmanaged.passRetained(self)
+                    self.retainedSelf = retained
+                    return retained.toOpaque()
+                }()
             ) else {
                 NSLog("[HotkeyManager] CGEventTap 创建失败，使用 NSEvent fallback + 定时重试")
                 globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] e in
@@ -208,6 +213,8 @@ class HotkeyManager {
         if let tap = eventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
             CFMachPortInvalidate(tap)
+            retainedSelf?.release()
+            retainedSelf = nil
         }
         if let source = runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
@@ -238,17 +245,10 @@ class HotkeyManager {
 
     // MARK: - 纯 modifier 键检测
 
-    /// 左右 modifier 配对表
-    private static let modifierPairs: [UInt16: UInt16] = [
-        55: 54, 54: 55,  // ⌘
-        56: 60, 60: 56,  // ⇧
-        58: 61, 61: 58,  // ⌥
-        59: 62, 62: 59,  // ⌃
-    ]
-
     private func handleModifierEvent(_ event: NSEvent) {
         let code = event.keyCode
-        guard code == config.keyCode || code == Self.modifierPairs[config.keyCode] else { return }
+        // 只匹配精确配置的 keyCode，不匹配左右配对键
+        guard code == config.keyCode else { return }
         let hasModifier = !event.modifierFlags.intersection([.shift, .control, .option, .command, .function]).isEmpty
         updateState(hasModifier)
     }
@@ -269,12 +269,21 @@ class HotkeyManager {
     }
 
     private func updateState(_ isDown: Bool) {
-        if isDown && !keyPressed {
-            keyPressed = true
-            DispatchQueue.main.async { [weak self] in self?.onKeyDown?() }
-        } else if !isDown && keyPressed {
-            keyPressed = false
-            DispatchQueue.main.async { [weak self] in self?.onKeyUp?() }
+        // global event monitor 可能在后台线程回调，统一到 main thread 处理
+        let block = { [weak self] in
+            guard let self else { return }
+            if isDown && !self.keyPressed {
+                self.keyPressed = true
+                self.onKeyDown?()
+            } else if !isDown && self.keyPressed {
+                self.keyPressed = false
+                self.onKeyUp?()
+            }
+        }
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
         }
     }
 }

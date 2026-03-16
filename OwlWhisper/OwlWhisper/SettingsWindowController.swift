@@ -183,9 +183,10 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
 
         refreshStatus()
 
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.refreshStatus()
         }
+        RunLoop.current.add(pollTimer!, forMode: .common)
 
         window = w
         w.center()
@@ -430,9 +431,12 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         let known = Self.asrTarSize
 
         try await downloader.download(from: url, to: dest) { [weak self] p in
-            let total = p.totalBytes > 0 ? p.totalBytes : known
-            self?.modelProgressBar.doubleValue = min(Double(p.bytesDownloaded) / Double(total), 1) * 0.75
-            self?.modelStatusLabel.stringValue = "\(L("download.asr")) \(p.bytesDownloaded / 1_000_000) / \(total / 1_000_000) MB"
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let total = p.totalBytes > 0 ? p.totalBytes : known
+                self.modelProgressBar.doubleValue = min(Double(p.bytesDownloaded) / Double(total), 1) * 0.75
+                self.modelStatusLabel.stringValue = "\(L("download.asr")) \(p.bytesDownloaded / 1_000_000) / \(total / 1_000_000) MB"
+            }
         }
 
         await MainActor.run {
@@ -459,9 +463,12 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         let known = Self.punctTarSize
 
         try await downloader.download(from: url, to: dest) { [weak self] p in
-            let total = p.totalBytes > 0 ? p.totalBytes : known
-            self?.modelProgressBar.doubleValue = 0.75 + min(Double(p.bytesDownloaded) / Double(total), 1) * 0.15
-            self?.modelStatusLabel.stringValue = "\(L("download.punct")) \(p.bytesDownloaded / 1_000_000) / \(total / 1_000_000) MB"
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let total = p.totalBytes > 0 ? p.totalBytes : known
+                self.modelProgressBar.doubleValue = 0.75 + min(Double(p.bytesDownloaded) / Double(total), 1) * 0.15
+                self.modelStatusLabel.stringValue = "\(L("download.punct")) \(p.bytesDownloaded / 1_000_000) / \(total / 1_000_000) MB"
+            }
         }
 
         await MainActor.run {
@@ -486,8 +493,11 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         let tmp = URL(fileURLWithPath: path + ".downloading")
 
         try await downloader.download(from: url, to: tmp) { [weak self] p in
-            self?.modelProgressBar.doubleValue = 0.95 + p.fraction * 0.05
-            self?.modelStatusLabel.stringValue = L("download.vad")
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.modelProgressBar.doubleValue = 0.95 + p.fraction * 0.05
+                self.modelStatusLabel.stringValue = L("download.vad")
+            }
         }
         try FileManager.default.moveItem(atPath: tmp.path, toPath: path)
     }
@@ -511,7 +521,11 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
             throw NSError(domain: "OwlWhisper", code: Int(code),
                 userInfo: [NSLocalizedDescriptionKey: "Extract failed (exit \(code))"])
         }
-        try? fm.removeItem(atPath: tarPath)
+        do {
+            try fm.removeItem(atPath: tarPath)
+        } catch {
+            NSLog("[Settings] 删除 tar 文件失败 (%@): %@", tarPath, error.localizedDescription)
+        }
 
         let extracted = (tmpDir as NSString).appendingPathComponent(name)
         if fm.fileExists(atPath: extracted) {
@@ -645,7 +659,11 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
             let bundleURL = URL(fileURLWithPath: Bundle.main.bundlePath)
             let config = NSWorkspace.OpenConfiguration()
             config.createsNewApplicationInstance = true
-            NSWorkspace.shared.openApplication(at: bundleURL, configuration: config) { _, _ in
+            NSWorkspace.shared.openApplication(at: bundleURL, configuration: config) { app, error in
+                if let error {
+                    NSLog("[Settings] 重启失败: %@", error.localizedDescription)
+                    return
+                }
                 DispatchQueue.main.async { NSApp.terminate(nil) }
             }
         }
@@ -660,5 +678,6 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         downloader?.cancel()
         downloadTaskHandle?.cancel()
         downloadTaskHandle = nil; downloader = nil
+        window = nil
     }
 }

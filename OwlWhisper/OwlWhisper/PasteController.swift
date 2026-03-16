@@ -6,23 +6,37 @@ class PasteController {
 
     /// 将文字粘贴到当前光标位置。
     func pasteText(_ text: String) {
+        // 检查辅助功能权限
+        guard AXIsProcessTrusted() else {
+            NSLog("[PasteController] 缺少辅助功能权限，无法模拟粘贴")
+            return
+        }
+
         // 保存原始剪贴板内容
         let pasteboard = NSPasteboard.general
         let previousContents = pasteboard.string(forType: .string)
 
         // 写入新文字到剪贴板
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        guard pasteboard.setString(text, forType: .string) else {
+            NSLog("[PasteController] 写入剪贴板失败")
+            return
+        }
 
         // 等待剪贴板就绪后模拟 Cmd+V
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            self.simulateCmdV()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.simulateCmdV()
 
             // 恢复原始剪贴板内容（延迟以确保粘贴完成）
             if let previous = previousContents {
+                let changeCount = pasteboard.changeCount
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    // 只在剪贴板未被其他应用修改时恢复
+                    guard pasteboard.changeCount == changeCount else { return }
                     pasteboard.clearContents()
-                    pasteboard.setString(previous, forType: .string)
+                    if !pasteboard.setString(previous, forType: .string) {
+                        NSLog("[PasteController] 恢复剪贴板失败")
+                    }
                 }
             }
         }

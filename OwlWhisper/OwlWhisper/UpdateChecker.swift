@@ -40,13 +40,36 @@ class UpdateChecker {
                     return
                 }
 
-                guard let data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let tagName = json["tag_name"] as? String else {
-                    NSLog("[UpdateChecker] Invalid response or missing tag_name")
+                // 检查 HTTP 状态码
+                if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                    NSLog("[UpdateChecker] HTTP %d", http.statusCode)
                     if !silent {
-                        showAlert(title: L("update.checkFailed"), message: "Invalid response")
+                        showAlert(title: L("update.checkFailed"), message: "HTTP \(http.statusCode)")
                     }
+                    return
+                }
+
+                guard let data else {
+                    if !silent { showAlert(title: L("update.checkFailed"), message: "No data") }
+                    return
+                }
+
+                let json: [String: Any]
+                do {
+                    guard let parsed = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                        if !silent { showAlert(title: L("update.checkFailed"), message: "Invalid JSON format") }
+                        return
+                    }
+                    json = parsed
+                } catch {
+                    NSLog("[UpdateChecker] JSON parse failed: %@", error.localizedDescription)
+                    if !silent { showAlert(title: L("update.checkFailed"), message: error.localizedDescription) }
+                    return
+                }
+
+                guard let tagName = json["tag_name"] as? String else {
+                    NSLog("[UpdateChecker] Missing tag_name in response")
+                    if !silent { showAlert(title: L("update.checkFailed"), message: "Invalid response") }
                     return
                 }
 
