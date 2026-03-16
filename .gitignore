@@ -1,0 +1,21 @@
+# Models (large binary files)
+models/
+
+# Native libraries (downloaded by setup.sh)
+OwlWhisper/Frameworks/*.dylib
+
+# macOS
+.DS_Store
+*.xcuserdata
+xcuserdata/
+
+# Xcode
+build/
+DerivedData/
+*.xcworkspace
+!VoiceInput.xcodeproj
+
+# IDE
+.idea/
+.vscode/
+*.swp

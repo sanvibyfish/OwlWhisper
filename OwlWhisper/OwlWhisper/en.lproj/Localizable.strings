@@ -1,0 +1,64 @@
+/* Settings Window - Guide */
+"guide.allReady" = "All Set";
+"guide.allReady.desc" = "Hold hotkey to speak, release to transcribe & paste";
+"guide.preparing" = "Preparing...";
+"guide.preparing.desc" = "Downloading voice models for first use";
+"guide.needModel" = "Models Required";
+"guide.needModel.desc" = "Tap \"Download\" below to start";
+"guide.needSetup" = "Setup Required";
+"guide.needSetup.desc" = "Please grant the permissions marked in red";
+
+/* Settings Window - Hotkey */
+"hotkey.hint" = "Click above to change hotkey";
+"hotkey.recording" = "Press a key...";
+
+/* Settings Window - Status Rows */
+"status.microphone" = "Microphone";
+"status.paste" = "Auto Paste";
+"status.model" = "Voice Model";
+"status.authorized" = "Authorized";
+"status.unauthorized" = "Unauthorized";
+"status.ready" = "Ready";
+"status.notDownloaded" = "Not Downloaded";
+"status.authorize" = "Grant";
+"status.download" = "Download";
+"status.retry" = "Retry";
+
+/* Settings Window - Download */
+"download.preparing" = "Preparing...";
+"download.failed" = "Download Failed";
+"download.extracting" = "Extracting...";
+"download.extractingPunct" = "Extracting punctuation...";
+"download.asr" = "ASR Model";
+"download.punct" = "Punctuation";
+"download.vad" = "VAD Model...";
+"download.dirFailed" = "Failed to create directory";
+
+/* Settings Window - Options */
+"settings.punctuation" = "Ending Period";
+"settings.language" = "Language";
+"settings.restartTitle" = "Restart Required";
+"settings.restartMessage" = "Language change requires a restart to take effect.";
+"settings.restartNow" = "Restart Now";
+"settings.restartLater" = "Later";
+"settings.restartFailed" = "Restart Failed";
+
+/* Update */
+"update.checkFailed" = "Update Check Failed";
+"update.upToDate" = "Up to Date";
+"update.currentVersion" = "You're running the latest version (%@).";
+"update.available" = "New Version %@ Available";
+"update.download" = "Download";
+"update.later" = "Later";
+"update.check" = "Check for Updates...";
+"update.copy" = "Copy";
+
+/* Menu */
+"menu.holdToSpeak" = "Hold %@ to speak";
+"menu.settings" = "Settings...";
+"menu.quit" = "Quit";
+
+/* Menu - Key Recorder */
+"recorder.hint" = "Click the area below, then press a hotkey";
+"recorder.support" = "Supports: ⌘Z, ⌥Space, Fn / Shift alone, etc.";
+"recorder.pressKey" = "Press a key...";

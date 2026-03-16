@@ -1,0 +1,35 @@
+name: OwlWhisper
+options:
+  bundleIdPrefix: com.sanvi
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "15.0"
+  minimumXcodeGenVersion: "2.38"
+
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_IDENTITY: "Apple Development"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: C3NL524YS6
+    ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  OwlWhisper:
+    type: application
+    platform: macOS
+    sources:
+      - path: OwlWhisper
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sanvi.OwlWhisper
+        INFOPLIST_FILE: OwlWhisper/Info.plist
+        PRODUCT_NAME: OwlWhisper
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: OwlWhisper/OwlWhisper.entitlements
+    entitlements:
+      path: OwlWhisper/OwlWhisper.entitlements
+      properties:
+        com.apple.security.device.audio-input: true

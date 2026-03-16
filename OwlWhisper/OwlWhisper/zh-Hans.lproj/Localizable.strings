@@ -1,0 +1,64 @@
+/* Settings Window - Guide */
+"guide.allReady" = "一切就绪";
+"guide.allReady.desc" = "按住快捷键说话，松开自动转写粘贴";
+"guide.preparing" = "正在准备...";
+"guide.preparing.desc" = "首次使用需要下载语音模型";
+"guide.needModel" = "需要下载模型";
+"guide.needModel.desc" = "点击下方「下载」开始";
+"guide.needSetup" = "完成设置";
+"guide.needSetup.desc" = "请授权下方标红的权限";
+
+/* Settings Window - Hotkey */
+"hotkey.hint" = "点击上方区域修改快捷键";
+"hotkey.recording" = "按下快捷键...";
+
+/* Settings Window - Status Rows */
+"status.microphone" = "麦克风";
+"status.paste" = "自动粘贴";
+"status.model" = "语音模型";
+"status.authorized" = "已授权";
+"status.unauthorized" = "未授权";
+"status.ready" = "已就绪";
+"status.notDownloaded" = "未下载";
+"status.authorize" = "授权";
+"status.download" = "下载";
+"status.retry" = "重试";
+
+/* Settings Window - Download */
+"download.preparing" = "准备下载...";
+"download.failed" = "下载失败";
+"download.extracting" = "解压中...";
+"download.extractingPunct" = "解压标点模型...";
+"download.asr" = "ASR 模型";
+"download.punct" = "标点模型";
+"download.vad" = "VAD 模型...";
+"download.dirFailed" = "目录创建失败";
+
+/* Settings Window - Options */
+"settings.punctuation" = "结尾句号";
+"settings.language" = "语言";
+"settings.restartTitle" = "需要重启";
+"settings.restartMessage" = "切换语言需要重启应用才能生效。";
+"settings.restartNow" = "立即重启";
+"settings.restartLater" = "稍后";
+"settings.restartFailed" = "重启失败";
+
+/* Update */
+"update.checkFailed" = "检查更新失败";
+"update.upToDate" = "已是最新版";
+"update.currentVersion" = "当前版本 %@ 已是最新。";
+"update.available" = "发现新版本 %@";
+"update.download" = "前往下载";
+"update.later" = "稍后";
+"update.check" = "检查更新...";
+"update.copy" = "复制";
+
+/* Menu */
+"menu.holdToSpeak" = "按住 %@ 说话";
+"menu.settings" = "设置...";
+"menu.quit" = "退出";
+
+/* Menu - Key Recorder */
+"recorder.hint" = "点击下方区域，然后按下快捷键";
+"recorder.support" = "支持: ⌘Z、⌥Space、单按 Fn / Shift 等任意按键";
+"recorder.pressKey" = "按下快捷键...";
