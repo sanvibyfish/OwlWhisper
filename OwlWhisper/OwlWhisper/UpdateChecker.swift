@@ -4,7 +4,7 @@ import Cocoa
 /// 检查 GitHub Releases 最新版本，提示用户更新。
 class UpdateChecker {
 
-    private static let repoOwner = "sanvi"
+    private static let repoOwner = "sanvibyfish"
     private static let repoName = "OwlWhisper"
     private static let releasesURL = "https://api.github.com/repos/\(repoOwner)/\(repoName)/releases/latest"
 
