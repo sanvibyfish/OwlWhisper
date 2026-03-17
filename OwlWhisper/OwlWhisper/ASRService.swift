@@ -22,9 +22,23 @@ class ASRService {
     private let vadWindowSize: Int32 = 512
     private var generation = 0  // 仅在 queue 上访问，用于检测 stop() 导致的指针失效
 
+    /// 空闲超时后自动卸载模型释放内存（秒）
+    private static let idleTimeout: TimeInterval = 60
+    private var idleTimer: DispatchWorkItem?
+
+    /// 验证模型文件并标记服务就绪（不加载到内存，首次使用时按需加载）。
     func start() {
         queue.async { [weak self] in
-            self?.loadModels()
+            self?.verifyModels()
+        }
+    }
+
+    /// 预加载模型到内存（非阻塞）。在录音开始时调用，录音期间完成加载。
+    func preload() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.idleTimer?.cancel()
+            self.ensureLoaded()
         }
     }
 
@@ -33,6 +47,8 @@ class ASRService {
         DispatchQueue.main.async { [weak self] in self?.isReady = false }
         queue.async { [weak self] in
             guard let self else { return }
+            self.idleTimer?.cancel()
+            self.idleTimer = nil
             self.generation += 1
             self.cleanupModels()
         }
@@ -47,9 +63,19 @@ class ASRService {
 
     func transcribe(audioData: Data, sampleRate: Int, completion: @escaping (Result<TranscribeResult, Error>) -> Void) {
         queue.async { [weak self] in
-            guard let self, let recognizer = self.recognizer, let vad = self.vad else {
+            guard let self else {
                 completion(.failure(NSError(domain: "ASRService", code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "ASR 未就绪"])))
+                    userInfo: [NSLocalizedDescriptionKey: "ASR 已释放"])))
+                return
+            }
+
+            // 取消空闲卸载计时器，按需加载模型
+            self.idleTimer?.cancel()
+            self.ensureLoaded()
+
+            guard let recognizer = self.recognizer, let vad = self.vad else {
+                completion(.failure(NSError(domain: "ASRService", code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "ASR 模型加载失败"])))
                 return
             }
             let gen = self.generation
@@ -110,6 +136,7 @@ class ASRService {
 
             if speechSamples.isEmpty {
                 let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+                self.scheduleIdleUnload()
                 completion(.success(TranscribeResult(text: "", hasSpeech: false, durationMs: ms)))
                 return
             }
@@ -144,7 +171,10 @@ class ASRService {
                 NSLog("[ASRService] SherpaOnnxGetOfflineStreamResult 返回 nil，可能模型状态异常")
             }
 
-            // 标点恢复
+            // 标点恢复（延迟加载标点模型：首次走到这里时才加载）
+            if !text.isEmpty {
+                if self.punctuation == nil { self.ensurePunctuationLoaded() }
+            }
             if !text.isEmpty, let punct = self.punctuation {
                 guard let cInput = strdup(text) else {
                     NSLog("[ASRService] strdup 失败（内存不足），跳过标点恢复")
@@ -163,8 +193,94 @@ class ASRService {
 
             let ms = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
             NSLog("[ASRService] 转写完成: \"%@\" (%dms, %d 语音样本)", text, ms, speechSamples.count)
+            self.scheduleIdleUnload()
             completion(.success(TranscribeResult(text: text, hasSpeech: true, durationMs: ms)))
         }
+    }
+
+    // MARK: - 延迟加载与空闲卸载
+
+    /// 仅验证模型文件存在，不加载到内存。
+    private func verifyModels() {
+        let modelsDir = findModelsDir()
+        guard !modelsDir.isEmpty else {
+            NSLog("[ASRService] 未找到 models 目录")
+            DispatchQueue.main.async { [weak self] in self?.onError?("未找到 models 目录，请先运行 scripts/setup.sh") }
+            return
+        }
+
+        let fm = FileManager.default
+        let contents: [String]
+        do {
+            contents = try fm.contentsOfDirectory(atPath: modelsDir)
+        } catch {
+            NSLog("[ASRService] 读取模型目录失败: %@", error.localizedDescription)
+            DispatchQueue.main.async { [weak self] in self?.onError?("读取模型目录失败: \(error.localizedDescription)") }
+            return
+        }
+
+        guard let asrDirName = contents.first(where: { $0.hasPrefix("sherpa-onnx-fire-red-asr") }) else {
+            NSLog("[ASRService] 未找到 FireRedASR 模型")
+            DispatchQueue.main.async { [weak self] in self?.onError?("未找到 FireRedASR 模型") }
+            return
+        }
+
+        modelName = asrDirName
+        let name = asrDirName
+        NSLog("[ASRService] 模型文件就绪（延迟加载）: %@", name)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isReady = true
+            self.onReady?(name)
+        }
+    }
+
+    /// 确保核心模型（ASR + VAD）已加载到内存（必须在 queue 上调用）。
+    private func ensureLoaded() {
+        guard recognizer == nil else { return }
+        let t0 = CFAbsoluteTimeGetCurrent()
+        NSLog("[ASRService] 按需加载模型到内存...")
+        loadModels()
+        let elapsed = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+        NSLog("[ASRService] 模型加载耗时 %dms", elapsed)
+    }
+
+    /// 按需加载标点模型（必须在 queue 上调用）。
+    private func ensurePunctuationLoaded() {
+        let modelsDir = findModelsDir()
+        guard !modelsDir.isEmpty else { return }
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(atPath: modelsDir),
+              let punctDirName = contents.first(where: { $0.hasPrefix("sherpa-onnx-punct-ct-transformer") }) else {
+            return
+        }
+        let punctModel = (modelsDir as NSString)
+            .appendingPathComponent(punctDirName)
+            .appending("/model.onnx")
+        guard fm.fileExists(atPath: punctModel) else { return }
+
+        NSLog("[ASRService] 按需加载标点模型...")
+        let t0 = CFAbsoluteTimeGetCurrent()
+        self.punctuation = createPunctuation(modelPath: punctModel)
+        let elapsed = Int((CFAbsoluteTimeGetCurrent() - t0) * 1000)
+        if self.punctuation != nil {
+            NSLog("[ASRService] 标点模型已加载 (%dms)", elapsed)
+        } else {
+            NSLog("[ASRService] 标点模型加载失败，将不加标点")
+        }
+    }
+
+    /// 转写完成后启动空闲计时器，超时后卸载模型释放内存（必须在 queue 上调用）。
+    private func scheduleIdleUnload() {
+        idleTimer?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            NSLog("[ASRService] 空闲 %.0f 秒，卸载模型释放内存", Self.idleTimeout)
+            self.generation += 1
+            self.cleanupModels()
+        }
+        self.idleTimer = work
+        queue.asyncAfter(deadline: .now() + Self.idleTimeout, execute: work)
     }
 
     // MARK: - 模型加载
@@ -247,27 +363,8 @@ class ASRService {
         }
         self.vad = v
 
-        // 标点恢复模型（可选，找不到就跳过）
-        if let punctDirName = contents.first(where: { $0.hasPrefix("sherpa-onnx-punct-ct-transformer") }) {
-            let punctDir = (modelsDir as NSString).appendingPathComponent(punctDirName)
-            let punctModel = (punctDir as NSString).appendingPathComponent("model.onnx")
-            if fm.fileExists(atPath: punctModel) {
-                NSLog("[ASRService] 加载标点模型...")
-                self.punctuation = createPunctuation(modelPath: punctModel)
-                if self.punctuation != nil {
-                    NSLog("[ASRService] 标点模型已加载")
-                } else {
-                    NSLog("[ASRService] 标点模型加载失败，将不加标点")
-                }
-            }
-        }
-
-        NSLog("[ASRService] ASR 模型已加载: %@", modelName)
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.isReady = true
-            self.onReady?(self.modelName)
-        }
+        // 标点恢复模型延迟到首次转写出文本时加载，加快 preload 速度
+        NSLog("[ASRService] 核心模型已加载到内存: %@（标点模型将在首次使用时加载）", modelName)
     }
 
     // sherpa-onnx Create* 函数在调用时拷贝字符串，defer { free } 是安全的

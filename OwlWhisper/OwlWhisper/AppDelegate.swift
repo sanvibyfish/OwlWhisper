@@ -88,6 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startRecording() {
         guard !isRecording, asrService?.isReady == true else { return }
+        asrService?.preload()  // 按需加载模型（录音期间完成加载）
 
         isRecording = true
         menubarController.setState(.recording)
