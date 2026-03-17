@@ -52,9 +52,9 @@
 
 ### 从 Release 下载（推荐）
 
-1. 从 [Releases](https://github.com/sanvibyfish/OwlWhisper/releases) 下载 `OwlWhisper.app.zip`
-2. 解压后移动到 `/Applications`
-3. 打开应用 — 首次启动自动下载模型（约 1.1GB）
+1. 从 [Releases](https://github.com/sanvibyfish/OwlWhisper/releases) 下载 `OwlWhisper-0.1.0.dmg`
+2. 打开 DMG，将 OwlWhisper 拖入 `/Applications`
+3. 启动应用 — 首次运行自动下载模型（约 1.1GB）
 
 ### 从源码编译
 

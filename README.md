@@ -52,9 +52,9 @@ Everything runs locally on your Mac. No data leaves your device.
 
 ### From Release (recommended)
 
-1. Download `OwlWhisper.app.zip` from [Releases](https://github.com/sanvibyfish/OwlWhisper/releases)
-2. Unzip and move to `/Applications`
-3. Open — models download automatically on first launch (~1.1GB)
+1. Download `OwlWhisper-0.1.0.dmg` from [Releases](https://github.com/sanvibyfish/OwlWhisper/releases)
+2. Open DMG, drag OwlWhisper to `/Applications`
+3. Launch — models download automatically on first run (~1.1GB)
 
 ### From Source
 
