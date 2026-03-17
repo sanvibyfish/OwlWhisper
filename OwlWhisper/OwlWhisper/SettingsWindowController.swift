@@ -243,9 +243,7 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
             btn.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             btn.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
 
-            status.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-            status.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor),
-            status.trailingAnchor.constraint(lessThanOrEqualTo: btn.leadingAnchor, constant: -4),
+            status.trailingAnchor.constraint(equalTo: row.trailingAnchor),
             status.centerYAnchor.constraint(equalTo: row.centerYAnchor),
         ])
 
@@ -257,6 +255,12 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         row.translatesAutoresizingMaskIntoConstraints = false
         row.widthAnchor.constraint(equalToConstant: width).isActive = true
         row.heightAnchor.constraint(equalToConstant: 22).isActive = true
+
+        let icon = makeImageView(size: 16)
+        icon.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        icon.contentTintColor = .secondaryLabelColor
+        icon.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(icon)
 
         let label = makeLabel(font: .systemFont(ofSize: 12))
         label.stringValue = L("settings.language")
@@ -275,8 +279,12 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
         row.addSubview(popup)
 
         NSLayoutConstraint.activate([
-            // 跟状态行的文字对齐（icon 16 + gap 6 = 22）
-            label.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 22),
+            icon.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            icon.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 16),
+            icon.heightAnchor.constraint(equalToConstant: 16),
+
+            label.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 6),
             label.centerYAnchor.constraint(equalTo: row.centerYAnchor),
 
             popup.trailingAnchor.constraint(equalTo: row.trailingAnchor),
@@ -361,12 +369,12 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
             icon.contentTintColor = .systemGreen
             label.stringValue = okText
             label.textColor = .secondaryLabelColor
+            label.isHidden = false
             btn.isHidden = true
         } else {
             icon.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: nil)
             icon.contentTintColor = .systemRed
-            label.stringValue = failText
-            label.textColor = .systemRed
+            label.isHidden = true
             btn.isHidden = false
         }
     }
