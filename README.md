@@ -1,18 +1,45 @@
-# OwlWhisper
+<p align="center">
+  <img src="OwlWhisper/OwlWhisper/Assets.xcassets/AppIcon.appiconset/icon_1024.png" width="128" alt="OwlWhisper icon">
+</p>
 
-Local voice input for macOS — hold a hotkey, speak, release, text appears at your cursor.
+<h1 align="center">OwlWhisper</h1>
 
-Fully offline. No cloud APIs. Chinese-optimized with FireRedASR2 (2.89% CER).
+<p align="center">
+  Local voice input for macOS — hold a hotkey, speak, release, text appears at your cursor.
+  <br>
+  Fully offline. No cloud APIs. Chinese-optimized with FireRedASR2.
+</p>
+
+<p align="center">
+  <a href="https://github.com/sanvibyfish/OwlWhisper/releases"><img src="https://img.shields.io/github/v/release/sanvibyfish/OwlWhisper?style=flat-square" alt="Release"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/arch-Apple%20Silicon-orange?style=flat-square" alt="Architecture">
+  <img src="https://img.shields.io/badge/license-GPL--3.0-blue?style=flat-square" alt="License">
+</p>
+
+<p align="center">
+  <strong>English</strong> | <a href="docs/README_zh.md">中文</a>
+</p>
+
+---
+
+## How It Works
+
+1. Hold your hotkey (default: `Fn`)
+2. Speak naturally
+3. Release — text is transcribed and pasted at your cursor
+
+Everything runs locally on your Mac. No data leaves your device.
 
 ## Features
 
-- **Hold-to-speak** — Global hotkey (default ⌥Z), works in any app
-- **Offline ASR** — FireRedASR2 int8 via sherpa-onnx C API, no Python dependency
-- **Auto punctuation** — ct-transformer restores commas, periods, etc.
-- **Auto paste** — Transcribed text is pasted at cursor via simulated ⌘V
-- **VAD** — Silero VAD trims silence, only speech is transcribed
+- **Hold-to-speak** — Global hotkey works in any app, fully configurable
+- **Offline ASR** — FireRedASR2 int8 via sherpa-onnx C API (2.89% CER on Chinese)
+- **Auto punctuation** — ct-transformer restores commas, periods, question marks
+- **Auto paste** — Transcribed text is pasted at cursor via simulated `Cmd+V`
+- **VAD** — Silero VAD trims silence, only speech is sent to ASR
 - **Floating indicator** — Waveform animation while recording, dots while transcribing
-- **Auto model download** — First launch downloads ~1.1GB of models automatically
+- **Auto model download** — First launch downloads ~1.1GB of models automatically with resume support
 - **i18n** — English (default) + Chinese
 - **Update checker** — Checks GitHub Releases for new versions
 
@@ -25,14 +52,14 @@ Fully offline. No cloud APIs. Chinese-optimized with FireRedASR2 (2.89% CER).
 
 ### From Release (recommended)
 
-1. Download `OwlWhisper.app.zip` from [Releases](https://github.com/sanvi/OwlWhisper/releases)
+1. Download `OwlWhisper.app.zip` from [Releases](https://github.com/sanvibyfish/OwlWhisper/releases)
 2. Unzip and move to `/Applications`
 3. Open — models download automatically on first launch (~1.1GB)
 
 ### From Source
 
 ```bash
-git clone https://github.com/sanvi/OwlWhisper.git
+git clone https://github.com/sanvibyfish/OwlWhisper.git
 cd OwlWhisper
 scripts/setup.sh          # downloads native libs + models
 open OwlWhisper/OwlWhisper.xcodeproj
@@ -41,25 +68,27 @@ open OwlWhisper/OwlWhisper.xcodeproj
 
 ## Permissions
 
+On first launch, OwlWhisper will guide you through granting the required permissions:
+
 | Permission | Purpose |
 |---|---|
-| Microphone | Record audio |
-| Accessibility | Simulate ⌘V paste |
-| Input Monitoring | Auto-granted for signed apps from /Applications |
+| Microphone | Record your speech |
+| Accessibility | Simulate `Cmd+V` paste and listen for global hotkeys |
 
 ## Architecture
 
 ```
 OwlWhisper.app
 ├── ASRService.swift          # sherpa-onnx C API: VAD + ASR + punctuation
-├── HotkeyManager.swift       # CGEventTap global hotkey detection
 ├── AudioRecorder.swift       # AVAudioEngine 16kHz mono capture
-├── FloatingIndicator.swift   # Waveform + dots animation
-├── SettingsWindowController  # Auto Layout settings/onboarding
+├── HotkeyManager.swift       # CGEventTap global hotkey detection
+├── FloatingIndicator.swift   # Waveform + dots animation overlay
+├── SettingsWindowController  # Auto Layout settings & onboarding
 ├── ModelDownloader.swift     # Chunked parallel download with resume
 ├── UpdateChecker.swift       # GitHub Release version check
 ├── MenubarController.swift   # Status bar icon + menu
-├── PasteController.swift     # CGEvent ⌘V simulation
+├── PasteController.swift     # CGEvent Cmd+V simulation
+├── AppDelegate.swift         # App lifecycle & orchestration
 └── Frameworks/
     ├── libsherpa-onnx-c-api.dylib
     └── libonnxruntime.1.23.2.dylib
@@ -67,7 +96,7 @@ OwlWhisper.app
 
 ## Models
 
-Downloaded to `~/Library/Application Support/OwlWhisper/models/`:
+Downloaded to `~/Library/Application Support/OwlWhisper/models/` on first launch:
 
 | Model | Size | Purpose |
 |---|---|---|
@@ -83,4 +112,4 @@ Downloaded to `~/Library/Application Support/OwlWhisper/models/`:
 
 ## License
 
-MIT
+[GPL-3.0](LICENSE)
