@@ -21,8 +21,8 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>OwlWhisper 需要麦克风权限来录制语音并转写为文字。</string>
+	<string>OwlWhisper needs microphone access to record speech and transcribe it to text.</string>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>OwlWhisper 需要辅助功能权限来监听全局快捷键和模拟粘贴。</string>
+	<string>OwlWhisper needs accessibility access to listen for global hotkeys and simulate paste.</string>
 </dict>
 </plist>

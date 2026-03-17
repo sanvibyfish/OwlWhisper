@@ -14,7 +14,7 @@
 
 /* Settings Window - Status Rows */
 "status.microphone" = "Microphone";
-"status.paste" = "Auto Paste";
+"status.paste" = "Accessibility";
 "status.model" = "Voice Model";
 "status.authorized" = "Authorized";
 "status.unauthorized" = "Unauthorized";

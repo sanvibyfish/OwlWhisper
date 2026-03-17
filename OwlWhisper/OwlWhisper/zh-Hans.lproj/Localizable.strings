@@ -14,7 +14,7 @@
 
 /* Settings Window - Status Rows */
 "status.microphone" = "麦克风";
-"status.paste" = "自动粘贴";
+"status.paste" = "辅助功能";
 "status.model" = "语音模型";
 "status.authorized" = "已授权";
 "status.unauthorized" = "未授权";

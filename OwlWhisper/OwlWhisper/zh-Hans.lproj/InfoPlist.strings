@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "OwlWhisper 需要麦克风权限来录制语音并转写为文字。";
+"NSAccessibilityUsageDescription" = "OwlWhisper 需要辅助功能权限来监听全局快捷键和模拟粘贴。";

@@ -241,10 +241,11 @@ class SettingsWindowController: NSObject, NSWindowDelegate {
 
             btn.trailingAnchor.constraint(equalTo: row.trailingAnchor),
             btn.centerYAnchor.constraint(equalTo: row.centerYAnchor),
-            btn.widthAnchor.constraint(equalToConstant: 48),
+            btn.widthAnchor.constraint(greaterThanOrEqualToConstant: 48),
 
             status.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 8),
-            status.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            status.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor),
+            status.trailingAnchor.constraint(lessThanOrEqualTo: btn.leadingAnchor, constant: -4),
             status.centerYAnchor.constraint(equalTo: row.centerYAnchor),
         ])
 
